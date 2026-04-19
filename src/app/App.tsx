@@ -7,15 +7,16 @@ import MarketingOrchestrationMap from './Pages/MarketingOrchestrationMap';
 
 type AppView = 'map' | 'workspace';
 type ThemeMode = 'light' | 'dark';
+type DecisionState = 'pending' | 'approved' | 'hold';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('map');
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
-  const [aiConsoleOpen, setAiConsoleOpen] = useState(true);
+  const [aiConsoleOpen, setAiConsoleOpen] = useState<boolean>(true);
   const [selectedDecision, setSelectedDecision] = useState<string | null>(null);
 
   const [decisionStates, setDecisionStates] = useState<
-    Record<string, 'pending' | 'approved' | 'hold'>
+    Record<string, DecisionState>
   >({
     decision1: 'pending',
     decision2: 'pending',
@@ -75,7 +76,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
       />
 
-      <div className="flex pt-16 min-h-[calc(100vh-4rem)]">
+      <div className="flex min-h-[calc(100vh-4rem)] pt-16">
         <LeftNavigation currentView={currentView} onNavigate={handleNavigate} />
 
         {currentView === 'map' ? (

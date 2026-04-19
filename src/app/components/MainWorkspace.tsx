@@ -4,11 +4,13 @@ import { DecisionCards } from './DecisionCards';
 import { SignalAlignment } from './SignalAlignment';
 import { RisksGuardrails } from './RisksGuardrails';
 
+type DecisionState = 'pending' | 'approved' | 'hold';
+
 interface MainWorkspaceProps {
   aiConsoleOpen: boolean;
   selectedDecision: string | null;
   setSelectedDecision: (id: string | null) => void;
-  decisionStates: Record<string, 'pending' | 'approved' | 'hold'>;
+  decisionStates: Record<string, DecisionState>;
   onApprove: (id: string) => void;
   onHold: (id: string) => void;
 }
@@ -23,22 +25,22 @@ export function MainWorkspace({
 }: MainWorkspaceProps) {
   return (
     <main
-      className="min-h-[calc(100vh-64px)] transition-all duration-300"
+      className="min-h-[calc(100vh-4rem)] flex-1 transition-all duration-300"
       style={{
-        background: '#F7F3EA',
-        paddingTop: '24px',
-        paddingLeft: 'calc(16rem + 24px)',
-        paddingRight: aiConsoleOpen ? 'calc(16rem + 24px)' : '24px',
+        marginLeft: '16rem',
+        marginRight: aiConsoleOpen ? '16rem' : '0rem',
+        background:
+          'linear-gradient(180deg, #FAF8F3 0%, #F4F1EA 48%, #FAF8F3 100%)',
       }}
     >
-      <div className="mx-auto w-full max-w-[1360px] pb-10">
+      <div className="mx-auto w-full max-w-[1180px] px-6 py-8">
         <WorkspaceHeader />
 
         <div className="mt-6">
           <ExecutiveSummary />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-8">
           <DecisionCards
             selectedDecision={selectedDecision}
             setSelectedDecision={setSelectedDecision}
@@ -48,11 +50,11 @@ export function MainWorkspace({
           />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-8">
           <SignalAlignment />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-8">
           <RisksGuardrails />
         </div>
       </div>

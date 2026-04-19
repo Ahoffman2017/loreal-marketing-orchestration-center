@@ -7,156 +7,137 @@ import {
   Users,
   MessageSquare,
   Send,
-  Bot,
+  CircleAlert,
+  CheckCircle2,
 } from 'lucide-react';
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from 'react';
-import type {
-  DecisionContext,
-  WorkspaceSnapshot,
-} from '../App';
+import { useMemo, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 
 interface AIConsoleProps {
   isOpen: boolean;
   onToggle: () => void;
   selectedDecision: string | null;
-  selectedDecisionData: DecisionContext | null;
-  selectedDecisionState: 'pending' | 'approved' | 'hold' | null;
-  workspaceSnapshot: WorkspaceSnapshot;
 }
 
-type ChatMessage = {
-  id: string;
-  role: 'assistant' | 'user';
-  text: string;
+type ConsoleContext = {
+  title: string;
+  recommendedNextAction: string;
+  whyRecommended: string;
+  whatChanged: string[];
+  riskIfNoAction: string;
+  stakeholders: {
+    name: string;
+    role: string;
+  }[];
+  confidence: number;
+};
+
+const workspaceContext: ConsoleContext = {
+  title: 'Workspace Recommendation',
+  recommendedNextAction: 'Prioritize the highest-value decision and validate signals before action.',
+  whyRecommended:
+    'The workspace is designed to bring market, creator, media, demand, and promotion signals together so teams can act with stronger alignment and confidence.',
+  whatChanged: [
+    'Creator-led momentum is showing strong cross-platform alignment',
+    'Market visibility and audience signals are moving together',
+    'Promotion and inventory guardrails remain important to review',
+    'Media activation appears ready for coordinated follow-up',
+  ],
+  riskIfNoAction:
+    'If the team does not act, the opportunity window may narrow, and stakeholders may lose time aligning across platforms.',
+  stakeholders: [
+    { name: 'Sophie Marchand', role: 'Brand Manager, Lancôme' },
+    { name: 'Thomas Laurent', role: 'Media Lead, EMEA' },
+    { name: 'Emma Chen', role: 'Creator Partnerships' },
+    { name: 'Marc Dubois', role: 'Demand Planning' },
+  ],
+  confidence: 86,
+};
+
+const decisionContexts: Record<string, ConsoleContext> = {
+  decision1: {
+    title: 'Creator-Led Growth Decision',
+    recommendedNextAction:
+      'Increase support for creator-led conversion clusters while the momentum window is still active.',
+    whyRecommended:
+      'Creator-led momentum for Génifique shows strong alignment across media, creator performance, demand stability, and low promotion risk.',
+    whatChanged: [
+      'Share-of-voice increased across priority conversations',
+      'Top creators exceeded performance benchmarks',
+      'Paid amplification audiences are ready',
+      'Inventory levels remain stable in key markets',
+    ],
+    riskIfNoAction:
+      'The opportunity window may close within 48 hours, reducing potential revenue lift and allowing competitors to capture momentum.',
+    stakeholders: [
+      { name: 'Sophie Marchand', role: 'Brand Manager, Lancôme' },
+      { name: 'Thomas Laurent', role: 'Media Lead, EMEA' },
+      { name: 'Emma Chen', role: 'Creator Partnerships' },
+      { name: 'Marc Dubois', role: 'Demand Planning' },
+    ],
+    confidence: 86,
+  },
+  decision2: {
+    title: 'Margin Protection Decision',
+    recommendedNextAction:
+      'Hold discounting in DACH and shift toward creator-led education while margin and inventory signals are reviewed.',
+    whyRecommended:
+      'Competitive pressure is present, but margin and inventory guardrails suggest that promotional action should be delayed.',
+    whatChanged: [
+      'Competitor pressure increased in DACH',
+      'Inventory confidence is below preferred threshold',
+      'Margin exposure remains elevated',
+      'Education-led support is the safer near-term path',
+    ],
+    riskIfNoAction:
+      'A rushed promotion could create unnecessary margin pressure and weaken brand-safe execution.',
+    stakeholders: [
+      { name: 'Claire Bernard', role: 'Promotion Strategy' },
+      { name: 'Jonas Weber', role: 'DACH Market Lead' },
+      { name: 'Nina Rossi', role: 'Finance Partner' },
+      { name: 'Marc Dubois', role: 'Demand Planning' },
+    ],
+    confidence: 78,
+  },
+  decision3: {
+    title: 'Media Reallocation Decision',
+    recommendedNextAction:
+      'Shift budget from flattening paid media into creator-supported conversion paths.',
+    whyRecommended:
+      'Traditional paid performance is flattening while creator-assisted conversion signals are strengthening.',
+    whatChanged: [
+      'Paid performance is showing signs of efficiency decline',
+      'Creator-assisted conversion is rising',
+      'Media budget can be shifted without major activation risk',
+      'Audience clusters are ready for targeted amplification',
+    ],
+    riskIfNoAction:
+      'Continuing the current budget mix may reduce efficiency and slow conversion momentum.',
+    stakeholders: [
+      { name: 'Thomas Laurent', role: 'Media Lead, EMEA' },
+      { name: 'Emma Chen', role: 'Creator Partnerships' },
+      { name: 'Priya Shah', role: 'Performance Marketing' },
+      { name: 'Sophie Marchand', role: 'Brand Manager, Lancôme' },
+    ],
+    confidence: 82,
+  },
 };
 
 export function AIConsole({
   isOpen,
   onToggle,
   selectedDecision,
-  selectedDecisionData,
-  selectedDecisionState,
-  workspaceSnapshot,
 }: AIConsoleProps) {
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      text: 'I’m ready. Ask me why a decision is recommended, what changed, what the key risks are, who to notify, or what to do next.',
-    },
-  ]);
 
-  const chatRef = useRef<HTMLDivElement | null>(null);
+  const context = useMemo(() => {
+    if (!selectedDecision) return workspaceContext;
+    return decisionContexts[selectedDecision] ?? workspaceContext;
+  }, [selectedDecision]);
 
   const placeholder = useMemo(() => {
     if (selectedDecision) return 'Ask about this decision...';
     return 'Ask about this workspace...';
   }, [selectedDecision]);
-
-  useEffect(() => {
-    if (!chatRef.current) return;
-    chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages]);
-
-  useEffect(() => {
-    if (!selectedDecisionData) return;
-    setMessages((prev) => {
-      const contextNote = `Context updated: ${selectedDecisionData.title}`;
-      const lastMessage = prev[prev.length - 1];
-      if (lastMessage?.text === contextNote) return prev;
-      return [
-        ...prev,
-        {
-          id: `context-${selectedDecisionData.id}-${Date.now()}`,
-          role: 'assistant',
-          text: contextNote,
-        },
-      ];
-    });
-  }, [selectedDecisionData]);
-
-  const quickPrompts = selectedDecisionData
-    ? [
-        'Why is this recommended?',
-        'Which platform is driving this?',
-        'Should I approve or hold this?',
-      ]
-    : [
-        'What is the biggest risk here?',
-        'What changed in the last 24 hours?',
-        'What should I do next?',
-      ];
-
-  const staticWhyText = selectedDecisionData
-    ? `This recommendation is being driven primarily by ${selectedDecisionData.primaryPlatform}. ${selectedDecisionData.summary}`
-    : `${workspaceSnapshot.recommendedNextAction}. Biggest opportunity: ${workspaceSnapshot.biggestOpportunity}. Biggest risk: ${workspaceSnapshot.biggestRisk}.`;
-
-  const staticChangeText = selectedDecisionData
-    ? selectedDecisionData.signals
-        .slice(0, 4)
-        .map((signal) => signal.note)
-    : workspaceSnapshot.recentChanges;
-
-  const staticRiskText = selectedDecisionData
-    ? buildRiskResponse(selectedDecisionData, selectedDecisionState)
-    : `The biggest workspace-level risk is ${workspaceSnapshot.biggestRisk}. Response window: ${workspaceSnapshot.responseWindow}.`;
-
-  const stakeholderList = selectedDecisionData
-    ? buildStakeholdersForDecision(selectedDecisionData)
-    : workspaceSnapshot.stakeholders;
-
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    const trimmed = message.trim();
-    if (!trimmed) return;
-
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      text: trimmed,
-    };
-
-    const assistantMessage: ChatMessage = {
-      id: `assistant-${Date.now() + 1}`,
-      role: 'assistant',
-      text: generateAgentResponse({
-        prompt: trimmed,
-        selectedDecisionData,
-        selectedDecisionState,
-        workspaceSnapshot,
-      }),
-    };
-
-    setMessages((prev) => [...prev, userMessage, assistantMessage]);
-    setMessage('');
-  };
-
-  const runQuickPrompt = (prompt: string) => {
-    const assistantMessage: ChatMessage = {
-      id: `assistant-${Date.now()}`,
-      role: 'assistant',
-      text: generateAgentResponse({
-        prompt,
-        selectedDecisionData,
-        selectedDecisionState,
-        workspaceSnapshot,
-      }),
-    };
-
-    setMessages((prev) => [
-      ...prev,
-      { id: `user-${Date.now() - 1}`, role: 'user', text: prompt },
-      assistantMessage,
-    ]);
-  };
 
   if (!isOpen) {
     return (
@@ -204,12 +185,20 @@ export function AIConsole({
                 className="mt-[2px] h-4 w-4 shrink-0"
                 style={{ color: '#C9A227' }}
               />
-              <h3
-                className="text-[13px] font-semibold leading-[1.25]"
-                style={{ color: '#111111' }}
-              >
-                AI Recommendation Layer
-              </h3>
+              <div>
+                <h3
+                  className="text-[13px] font-semibold leading-[1.25]"
+                  style={{ color: '#111111' }}
+                >
+                  AI Recommendation Layer
+                </h3>
+                <p
+                  className="mt-1 text-[11px] leading-[1.35]"
+                  style={{ color: '#6B7280' }}
+                >
+                  {context.title}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -231,17 +220,24 @@ export function AIConsole({
 
       <div className="space-y-5 px-3 py-4">
         <Section
+          icon={Sparkles}
+          title="Recommended Next Action"
+          content={context.recommendedNextAction}
+          highlight
+        />
+
+        <Section
           icon={TrendingUp}
           title="Why this action is recommended"
-          content={staticWhyText}
+          content={context.whyRecommended}
         />
 
         <Section
           icon={AlertCircle}
-          title="What changed in the last 24 hours"
+          title="What changed"
           content={
             <ul className="space-y-2">
-              {staticChangeText.map((item) => (
+              {context.whatChanged.map((item) => (
                 <BulletItem key={item} text={item} />
               ))}
             </ul>
@@ -249,27 +245,24 @@ export function AIConsole({
         />
 
         <Section
-          icon={AlertCircle}
-          title="What could happen if no action is taken"
-          content={staticRiskText}
+          icon={CircleAlert}
+          title="Risk if no action is taken"
+          content={context.riskIfNoAction}
           warning
         />
 
         <Section
           icon={Users}
-          title="Suggested stakeholders to notify"
+          title="Suggested stakeholders"
           content={
             <div className="space-y-2">
-              {stakeholderList.map((stakeholder) => {
-                const [name, role] = stakeholder.split(' — ');
-                return (
-                  <Stakeholder
-                    key={stakeholder}
-                    name={name}
-                    role={role ?? 'Relevant stakeholder'}
-                  />
-                );
-              })}
+              {context.stakeholders.map((stakeholder) => (
+                <Stakeholder
+                  key={stakeholder.name}
+                  name={stakeholder.name}
+                  role={stakeholder.role}
+                />
+              ))}
             </div>
           }
         />
@@ -279,9 +272,10 @@ export function AIConsole({
           style={{ borderColor: '#E7E1D2' }}
         >
           <div
-            className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em]"
+            className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
             style={{ color: '#6B7280' }}
           >
+            <CheckCircle2 className="h-4 w-4" style={{ color: '#C9A227' }} />
             Confidence Score
           </div>
 
@@ -296,7 +290,7 @@ export function AIConsole({
               <div
                 className="h-full"
                 style={{
-                  width: workspaceSnapshot.decisionConfidence,
+                  width: `${context.confidence}%`,
                   borderRadius: '6px',
                   background:
                     'linear-gradient(90deg, rgba(201,162,39,0.85) 0%, #C9A227 100%)',
@@ -308,69 +302,8 @@ export function AIConsole({
               className="text-[18px] font-semibold"
               style={{ color: '#B88A12' }}
             >
-              {workspaceSnapshot.decisionConfidence}
+              {context.confidence}%
             </div>
-          </div>
-        </div>
-
-        <div
-          className="border-t pt-4"
-          style={{ borderColor: '#E7E1D2' }}
-        >
-          <div
-            className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
-            style={{ color: '#6B7280' }}
-          >
-            <Bot className="h-4 w-4" style={{ color: '#C9A227' }} />
-            Live AI Response
-          </div>
-
-          <div
-            ref={chatRef}
-            className="max-h-[240px] space-y-2 overflow-y-auto pr-1"
-          >
-            {messages.map((item) => (
-              <div
-                key={item.id}
-                className="border px-3 py-2 text-[12px] leading-[1.6]"
-                style={{
-                  borderRadius: '6px',
-                  borderColor: item.role === 'assistant' ? '#E7E1D2' : 'rgba(201,162,39,0.22)',
-                  background:
-                    item.role === 'assistant'
-                      ? '#FAF8F3'
-                      : 'rgba(201,162,39,0.08)',
-                  color: '#2F3742',
-                }}
-              >
-                <div
-                  className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
-                  style={{ color: '#6B7280' }}
-                >
-                  {item.role === 'assistant' ? 'AI Agent' : 'You'}
-                </div>
-                {item.text}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {quickPrompts.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => runQuickPrompt(prompt)}
-                className="border px-2.5 py-1.5 text-[11px] font-medium transition-all duration-200 hover:bg-black/[0.02]"
-                style={{
-                  borderRadius: '6px',
-                  borderColor: '#E7E1D2',
-                  background: '#FFFFFF',
-                  color: '#4B5563',
-                }}
-              >
-                {prompt}
-              </button>
-            ))}
           </div>
         </div>
       </div>
@@ -393,7 +326,7 @@ export function AIConsole({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <div className="flex gap-2">
           <input
             type="text"
             value={message}
@@ -409,7 +342,7 @@ export function AIConsole({
           />
 
           <button
-            type="submit"
+            type="button"
             className="flex h-[38px] w-[38px] items-center justify-center transition-all duration-200 hover:opacity-90"
             style={{
               borderRadius: '6px',
@@ -420,170 +353,10 @@ export function AIConsole({
           >
             <Send className="h-4 w-4" />
           </button>
-        </form>
+        </div>
       </div>
     </aside>
   );
-}
-
-function generateAgentResponse({
-  prompt,
-  selectedDecisionData,
-  selectedDecisionState,
-  workspaceSnapshot,
-}: {
-  prompt: string;
-  selectedDecisionData: DecisionContext | null;
-  selectedDecisionState: 'pending' | 'approved' | 'hold' | null;
-  workspaceSnapshot: WorkspaceSnapshot;
-}) {
-  const input = prompt.toLowerCase();
-
-  if (
-    input.includes('why') ||
-    input.includes('recommend') ||
-    input.includes('platform driving') ||
-    input.includes('driving this')
-  ) {
-    if (selectedDecisionData) {
-      const strongestSignals = selectedDecisionData.signals
-        .slice(0, 2)
-        .map((signal) => `${signal.label}: ${signal.note}`)
-        .join(' ');
-      return `Decision Explainer Agent: ${selectedDecisionData.title} is recommended because ${selectedDecisionData.primaryPlatform} is the primary driver and the supporting signals are aligned. ${strongestSignals} Recommendation: ${selectedDecisionData.recommendation}`;
-    }
-
-    return `Decision Explainer Agent: The current workspace recommendation is ${workspaceSnapshot.recommendedNextAction}. It is supported by the biggest opportunity, ${workspaceSnapshot.biggestOpportunity}, while still accounting for the biggest risk, ${workspaceSnapshot.biggestRisk}.`;
-  }
-
-  if (
-    input.includes('changed') ||
-    input.includes('24 hours') ||
-    input.includes('recent')
-  ) {
-    const changes = selectedDecisionData
-      ? selectedDecisionData.signals.map((signal) => signal.note).join(' ')
-      : workspaceSnapshot.recentChanges.join(' ');
-    return `Signal Analyst Agent: Here is the latest shift in context. ${changes}`;
-  }
-
-  if (
-    input.includes('risk') ||
-    input.includes('guardrail') ||
-    input.includes('delay') ||
-    input.includes('do nothing') ||
-    input.includes('hold')
-  ) {
-    if (selectedDecisionData) {
-      return buildRiskResponse(selectedDecisionData, selectedDecisionState);
-    }
-
-    return `Guardrail Agent: The biggest workspace-level risk is ${workspaceSnapshot.biggestRisk}. Response window is ${workspaceSnapshot.responseWindow}, so waiting too long could reduce decision confidence and delay the next action.`;
-  }
-
-  if (
-    input.includes('notify') ||
-    input.includes('stakeholder') ||
-    input.includes('who should')
-  ) {
-    const stakeholders = selectedDecisionData
-      ? buildStakeholdersForDecision(selectedDecisionData)
-      : workspaceSnapshot.stakeholders;
-
-    return `Stakeholder Agent: The best people to involve now are ${stakeholders.join(
-      '; '
-    )}.`;
-  }
-
-  if (
-    input.includes('approve') ||
-    input.includes('what next') ||
-    input.includes('next step') ||
-    input.includes('next action') ||
-    input.includes('budget') ||
-    input.includes('timing') ||
-    input.includes('assign')
-  ) {
-    if (selectedDecisionData) {
-      return buildActionResponse(
-        selectedDecisionData,
-        selectedDecisionState,
-        workspaceSnapshot
-      );
-    }
-
-    return `Action Planner Agent: The next best move is ${workspaceSnapshot.recommendedNextAction}. Keep focus on the ${workspaceSnapshot.responseWindow.toLowerCase()} window and align the key stakeholders before execution.`;
-  }
-
-  if (selectedDecisionData) {
-    return `Agent Router: For ${selectedDecisionData.title}, I can explain why it is recommended, summarize the supporting signals, identify the key risk, recommend who to notify, or suggest the next action.`;
-  }
-
-  return `Agent Router: I can explain the current recommendation, summarize recent changes, identify the biggest risk, recommend stakeholders to notify, or suggest the next action for the workspace.`;
-}
-
-function buildRiskResponse(
-  decision: DecisionContext,
-  state: 'pending' | 'approved' | 'hold' | null
-) {
-  const riskSignals = decision.signals
-    .filter((signal) =>
-      ['Warning', 'Alert', 'Caution', 'Declining'].includes(signal.status)
-    )
-    .map((signal) => `${signal.label}: ${signal.note}`);
-
-  const riskText =
-    riskSignals.length > 0
-      ? riskSignals.join(' ')
-      : `Current risk level is ${decision.risk}.`;
-
-  return `Guardrail Agent: ${decision.title} currently carries ${decision.risk.toLowerCase()} risk. ${riskText} Current state is ${
-    state ?? 'pending'
-  }. If no action is taken, the likely outcome is weaker execution confidence and a missed response window.`;
-}
-
-function buildActionResponse(
-  decision: DecisionContext,
-  state: 'pending' | 'approved' | 'hold' | null,
-  workspaceSnapshot: WorkspaceSnapshot
-) {
-  if (state === 'approved') {
-    return `Action Planner Agent: This decision is already approved. The next step is execution through ${decision.primaryPlatform} and stakeholder coordination inside the ${workspaceSnapshot.responseWindow.toLowerCase()} window.`;
-  }
-
-  if (state === 'hold') {
-    return `Action Planner Agent: This decision is currently on hold. The best next step is to resolve the main risk signal first, then re-evaluate whether the recommendation should move back to approval.`;
-  }
-
-  if (decision.risk === 'Medium' || decision.risk === 'High') {
-    return `Action Planner Agent: I recommend a controlled hold with stakeholder review before approval. Start with ${decision.primaryPlatform}, confirm the main risk signals, and only then move to execution.`;
-  }
-
-  return `Action Planner Agent: I recommend approval. The signals are aligned, the primary driver is ${decision.primaryPlatform}, and the recommended action is ${decision.recommendation}`;
-}
-
-function buildStakeholdersForDecision(decision: DecisionContext) {
-  if (decision.id === 'decision1') {
-    return [
-      'Sophie Marchand — Brand Manager, Lancôme',
-      'Emma Chen — Creator Partnerships',
-      'Thomas Laurent — Media Lead, EMEA',
-    ];
-  }
-
-  if (decision.id === 'decision2') {
-    return [
-      'Marc Dubois — Demand Planning',
-      'Sophie Marchand — Brand Manager, Lancôme',
-      'Thomas Laurent — Media Lead, EMEA',
-    ];
-  }
-
-  return [
-    'Thomas Laurent — Media Lead, EMEA',
-    'Emma Chen — Creator Partnerships',
-    'Sophie Marchand — Brand Manager, Lancôme',
-  ];
 }
 
 function Section({
@@ -591,11 +364,13 @@ function Section({
   title,
   content,
   warning = false,
+  highlight = false,
 }: {
-  icon: typeof TrendingUp;
+  icon: ComponentType<{ className?: string; style?: CSSProperties }>;
   title: string;
   content: ReactNode;
   warning?: boolean;
+  highlight?: boolean;
 }) {
   return (
     <section>
@@ -613,7 +388,7 @@ function Section({
       </div>
 
       <div
-        className={`${warning ? 'border px-3 py-3' : ''} text-[13px] leading-[1.7]`}
+        className={`${warning || highlight ? 'border px-3 py-3' : ''} text-[13px] leading-[1.7]`}
         style={
           warning
             ? {
@@ -622,9 +397,16 @@ function Section({
                 background: 'rgba(17,17,17,0.03)',
                 color: '#2F3742',
               }
-            : {
-                color: '#4B5563',
-              }
+            : highlight
+              ? {
+                  borderRadius: '6px',
+                  borderColor: 'rgba(201,162,39,0.28)',
+                  background: 'rgba(201,162,39,0.08)',
+                  color: '#2F3742',
+                }
+              : {
+                  color: '#4B5563',
+                }
         }
       >
         {content}
